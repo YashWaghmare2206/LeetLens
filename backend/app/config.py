@@ -8,9 +8,6 @@ import os
 
 
 class Settings(BaseSettings):
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./leetlens.db"
-
     # LeetCode
     LEETCODE_GRAPHQL_URL: str = "https://leetcode.com/graphql"
 

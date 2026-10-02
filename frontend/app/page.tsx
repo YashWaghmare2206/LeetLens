@@ -63,7 +63,7 @@ export default function HomePage() {
     progressTimersRef.current = [t1, t2, t3, t4];
 
     try {
-      await api.triggerSync(raw);
+      await api.getOverview(raw);
       clearTimers();
 
       const usernameMatch = raw.match(/leetcode\.com\/(?:u\/)?([^/?#]+)/);

@@ -12,10 +12,11 @@ import json
 import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem, Difficulty
+from app.schemas.enums import Difficulty
+from app.schemas.stateless import StatelessSolved
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 
 def _slugify(text: str) -> str:
@@ -24,8 +25,8 @@ def _slugify(text: str) -> str:
 
 def compute_patterns(
     username: str,
-    solved: list[UserSolvedProblem],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    user: StatelessUser | None = None,
 ) -> dict:
     stats: dict[str, dict] = defaultdict(lambda: {
         "pattern": "",
@@ -114,9 +115,9 @@ def compute_patterns(
 
 def compute_pattern_detail(
     username: str,
-    solved: list[UserSolvedProblem],
+    solved: list[StatelessSolved],
     pattern_slug: str,
-    user: User | None = None,
+    user: StatelessUser | None = None,
 ) -> dict | None:
     """Returns detail for a single pattern, or None if pattern not found in user's solved."""
     aggregated = compute_patterns(username, solved, user=user)

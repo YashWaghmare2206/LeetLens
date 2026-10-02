@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from app.models.problem import Difficulty
+from app.schemas.enums import Difficulty
 from app.providers.leetcode.client import LeetCodeProvider
 from app.data.taxonomy import TOPICS, TAXONOMY, PROBLEM_PATTERNS
 from app.analysis.overview import compute_overview
@@ -33,78 +33,10 @@ def _to_slug(name: str) -> str:
 
 
 
-@dataclass
-class StatelessTopic:
-    id: int
-    name: str
-    slug: str
-
-
-@dataclass
-class StatelessProblemTopic:
-    topic: StatelessTopic
-
-
-@dataclass
-class StatelessPattern:
-    id: int
-    name: str
-    slug: str
-    description: str = ""
-    parent: str | None = None
-    parent_id: int | None = None
-    parent_topic: StatelessTopic | None = None
-
-
-@dataclass
-class StatelessProblemPattern:
-    pattern: StatelessPattern
-    confidence: float
-
-
-@dataclass
-class StatelessProblem:
-    id: int
-    leetcode_id: int
-    title: str
-    slug: str
-    difficulty: Difficulty
-    url: str | None = None
-    is_paid_only: bool = False
-    topics: list[StatelessProblemTopic] = field(default_factory=list)
-    patterns: list[StatelessProblemPattern] = field(default_factory=list)
-
-
-@dataclass
-class StatelessSolved:
-    problem: StatelessProblem
-    last_solved_at: datetime | None
-
-
-@dataclass
-class StatelessUser:
-    id: int
-    username: str
-    real_name: str | None = None
-    avatar_url: str | None = None
-    ranking: int | None = None
-    total_solved: int = 0
-    easy_solved: int = 0
-    medium_solved: int = 0
-    hard_solved: int = 0
-    total_submissions: int = 0
-    streak: int | None = None
-    total_active_days: int | None = None
-    beats_easy: float | None = None
-    beats_medium: float | None = None
-    beats_hard: float | None = None
-    badges_json: str | None = None
-    upcoming_badges_json: str | None = None
-    languages_json: str | None = None
-    submission_calendar_json: str | None = None
-    skill_stats_json: str | None = None
-    acceptance_rate: float | None = None
-    reputation: int | None = None
+from app.schemas.stateless import (
+    StatelessTopic, StatelessProblemTopic, StatelessPattern, StatelessProblemPattern,
+    StatelessProblem, StatelessSolved, StatelessUser
+)
 
 
 
@@ -148,7 +80,6 @@ class StatelessService:
     async def get_or_fetch(username: str, force: bool = False) -> dict[str, Any] | None:
         """Fetch and compute all analytics in-memory directly from LeetCode."""
         normalized = username.strip().lower()
-        now = time.time()
 
         if not force and normalized in _STATELESS_STORE:
             return _STATELESS_STORE[normalized]
@@ -275,7 +206,7 @@ class StatelessService:
                             matched_pat = _PATTERN_MAP.get(t_slug) or _PATTERN_MAP.get(tag)
                             if matched_pat and matched_pat.slug not in seen_pat_slugs:
                                 seen_pat_slugs.add(matched_pat.slug)
-                                problem_patterns.append(StatelessProblemPattern(pattern=matched_pat, confidence=0.85))
+                                problem_patterns.append(StatelessProblemPattern(pattern=matched_pat, confidence=0.5))
 
                 prob = StatelessProblem(
                     id=idx,
@@ -316,7 +247,6 @@ class StatelessService:
         problems_list.sort(key=lambda x: x["leetcode_id"])
 
         data = {
-            "cached_at": now,
             "user": {
                 "id": 1,
                 "username": username,

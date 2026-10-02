@@ -7,11 +7,12 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem, Difficulty
+from app.schemas.enums import Difficulty
+from app.schemas.stateless import StatelessSolved
 from app.data.taxonomy import TOPICS, TAXONOMY, PROBLEM_PATTERNS
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 # Standard interview problem recommendations by pattern name (canonical LeetCode problems)
 PATTERN_RECOMMENDED_PROBLEMS: dict[str, list[dict]] = {
@@ -259,8 +260,8 @@ def _mastery_level(count: int) -> str:
 
 def compute_taxonomy_explorer(
     username: str,
-    solved: list[UserSolvedProblem],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    user: StatelessUser | None = None,
 ) -> dict:
     """Computes a nested hierarchy: Topics → Patterns → Solved Problems + Recommendations."""
 

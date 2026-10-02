@@ -1,6 +1,6 @@
 """Pydantic schemas for analysis engine responses."""
 from pydantic import BaseModel
-from app.models.problem import Difficulty
+from app.schemas.enums import Difficulty
 
 
 class DifficultyBreakdown(BaseModel):

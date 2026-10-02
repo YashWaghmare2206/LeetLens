@@ -10,11 +10,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem
+from app.schemas.stateless import StatelessSolved
 from app.data.taxonomy import TOPICS, TAXONOMY
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 # Canonical high-frequency interview problems with company tags
 PATTERN_PRACTICE_CURRICULUM: dict[str, list[dict]] = {
@@ -162,8 +162,8 @@ TOPIC_GROUPS: dict[str, list[str]] = {
 
 def compute_pattern_practice(
     username: str,
-    solved: list[UserSolvedProblem],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    user: StatelessUser | None = None,
 ) -> dict:
     """
     Computes curated practice roadmaps with Company Tags & Spaced Repetition.

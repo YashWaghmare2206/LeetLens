@@ -10,11 +10,12 @@ Evaluates a student's DSA progress across:
 from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem, Difficulty
+from app.schemas.enums import Difficulty
+from app.schemas.stateless import StatelessSolved
 from app.data.taxonomy import TOPICS, TAXONOMY
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 # High-frequency interview patterns and their interview weight (1 to 10)
 HIGH_FREQUENCY_PATTERNS = {
@@ -104,8 +105,8 @@ TARGET_RECOMMENDED_PROBLEMS = [
 
 def compute_student_analysis(
     username: str,
-    solved: list[UserSolvedProblem],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    user: StatelessUser | None = None,
 ) -> dict:
     """Computes an actionable, comprehensive diagnostic report for a DSA student."""
     total_solved = user.total_solved if (user and user.total_solved > 0) else len(solved)

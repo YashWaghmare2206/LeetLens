@@ -3,8 +3,8 @@ Tests for the analysis engine — the core of LeetLens.
 These are pure-logic tests (no DB, no HTTP).
 """
 import pytest
-from unittest.mock import MagicMock
-from app.models.problem import Difficulty, UserSolvedProblem, Problem, ProblemPattern, Pattern, ProblemTopic, Topic
+from app.schemas.enums import Difficulty
+from app.schemas.stateless import StatelessSolved, StatelessProblem, StatelessProblemPattern, StatelessPattern, StatelessProblemTopic, StatelessTopic
 from app.analysis.overview import compute_overview
 from app.analysis.topics import compute_topics
 from app.analysis.patterns import compute_patterns, compute_pattern_detail
@@ -18,41 +18,31 @@ def _make_problem(
     difficulty: Difficulty = Difficulty.MEDIUM,
     patterns: list[str] = None,
     topics: list[str] = None,
-) -> Problem:
-    p = MagicMock(spec=Problem)
-    p.leetcode_id = lid
-    p.title = title
-    p.slug = slug
-    p.difficulty = difficulty
-    p.url = f"https://leetcode.com/problems/{slug}/"
-
-    # Build patterns
-    p.patterns = []
+) -> StatelessProblem:
+    p_patterns = []
     for pname in (patterns or []):
-        pp = MagicMock(spec=ProblemPattern)
-        pat = MagicMock(spec=Pattern)
-        pat.name = pname
-        pat.slug = pname.lower().replace(" ", "-")
-        pp.pattern = pat
-        p.patterns.append(pp)
-
-    # Build topics
-    p.topics = []
+        pat = StatelessPattern(id=1, name=pname, slug=pname.lower().replace(" ", "-"))
+        p_patterns.append(StatelessProblemPattern(pattern=pat, confidence=1.0))
+        
+    p_topics = []
     for tname in (topics or []):
-        pt = MagicMock(spec=ProblemTopic)
-        top = MagicMock(spec=Topic)
-        top.name = tname
-        top.slug = tname.lower().replace(" ", "-")
-        pt.topic = top
-        p.topics.append(pt)
+        top = StatelessTopic(id=1, name=tname, slug=tname.lower().replace(" ", "-"))
+        p_topics.append(StatelessProblemTopic(topic=top))
+        
+    return StatelessProblem(
+        id=lid,
+        leetcode_id=lid,
+        title=title,
+        slug=slug,
+        difficulty=difficulty,
+        url=f"https://leetcode.com/problems/{slug}/",
+        topics=p_topics,
+        patterns=p_patterns
+    )
 
-    return p
 
-
-def _make_usp(problem: Problem) -> UserSolvedProblem:
-    usp = MagicMock(spec=UserSolvedProblem)
-    usp.problem = problem
-    return usp
+def _make_usp(problem: StatelessProblem) -> StatelessSolved:
+    return StatelessSolved(problem=problem, last_solved_at=None)
 
 
 
@@ -183,13 +173,8 @@ class TestPatterns:
 
 
 class TestCoverage:
-    def _make_pattern(self, name: str, pid: int = 1) -> Pattern:
-        p = MagicMock(spec=Pattern)
-        p.name = name
-        p.slug = name.lower().replace(" ", "-")
-        p.id = pid
-        p.parent_id = None
-        return p
+    def _make_pattern(self, name: str, pid: int = 1) -> StatelessPattern:
+        return StatelessPattern(id=pid, name=name, slug=name.lower().replace(" ", "-"))
 
     def test_no_solved_all_unpracticed(self):
         patterns = [self._make_pattern("Sliding Window"), self._make_pattern("BFS")]

@@ -8,16 +8,16 @@ import json
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem
+from app.schemas.stateless import StatelessSolved
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 
 def compute_activity_timeline(
     username: str,
-    solved: list[UserSolvedProblem],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    user: StatelessUser | None = None,
 ) -> dict:
     """
     Computes:

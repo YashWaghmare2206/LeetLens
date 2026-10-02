@@ -7,17 +7,17 @@ are properly recognized.
 from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
-from app.models.problem import UserSolvedProblem, Pattern
+from app.schemas.stateless import StatelessSolved, StatelessPattern
 
 if TYPE_CHECKING:
-    from app.models.user import User
+    from app.schemas.stateless import StatelessUser
 
 
 def compute_coverage(
     username: str,
-    solved: list[UserSolvedProblem],
-    all_patterns: list[Pattern],
-    user: User | None = None,
+    solved: list[StatelessSolved],
+    all_patterns: list[StatelessPattern],
+    user: StatelessUser | None = None,
 ) -> dict:
     # 1. Collect patterns from confirmed problems
     practiced_slugs: dict[str, int] = {}

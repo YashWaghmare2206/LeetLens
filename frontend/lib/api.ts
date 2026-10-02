@@ -245,11 +245,6 @@ export interface StudentAnalysisResponse {
 
 
 export const api = {
-  triggerSync: (username: string) =>
-    request<SyncJob>(`/api/v1/users/${encodeURIComponent(username)}/sync`, { method: "POST" }),
-
-  getSyncStatus: (jobId: number) =>
-    request<SyncJob>(`/api/v1/sync/${jobId}`),
 
   getUser: (username: string) =>
     request<UserProfile>(`/api/v1/users/${encodeURIComponent(username)}`),
@@ -273,12 +268,6 @@ export const api = {
     const params = difficulty ? `?difficulty=${difficulty}` : "";
     return request<ProblemsResponse>(`/api/v1/users/${encodeURIComponent(username)}/problems${params}`);
   },
-
-  importProblems: (username: string, items: string[]) =>
-    request<{ status: string; added: number }>(`/api/v1/users/${encodeURIComponent(username)}/problems/import`, {
-      method: "POST",
-      body: JSON.stringify({ items }),
-    }),
 
   getTaxonomyExplorer: (username: string) =>
     request<TaxonomyExplorerResponse>(`/api/v1/users/${encodeURIComponent(username)}/taxonomy-explorer`),
