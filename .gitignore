@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+.next/
+.turbo/
+dist/
+out/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — NEVER commit
+*.env
+!.env.example
+!.env.local.example
