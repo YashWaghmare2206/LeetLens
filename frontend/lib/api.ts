@@ -140,19 +140,6 @@ export interface ProblemsResponse {
   problems: ProblemInPattern[];
 }
 
-export type SyncStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
-
-export interface SyncJob {
-  id: number;
-  user_id: number;
-  status: SyncStatus;
-  progress: number;
-  started_at: string | null;
-  completed_at: string | null;
-  error: string | null;
-  created_at: string;
-}
-
 export interface PatternExplorerItem {
   pattern_name: string;
   pattern_slug: string;
@@ -245,6 +232,11 @@ export interface StudentAnalysisResponse {
 
 
 export const api = {
+  enrichHistory: (username: string, history: ProblemInPattern[]) =>
+    request<{ problems: ProblemInPattern[] }>(`/api/v1/users/${encodeURIComponent(username)}/enrich`, {
+      method: "POST",
+      body: JSON.stringify({ history }),
+    }),
 
   getUser: (username: string) =>
     request<UserProfile>(`/api/v1/users/${encodeURIComponent(username)}`),

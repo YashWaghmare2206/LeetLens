@@ -89,11 +89,18 @@ export default function Sidebar({ username }: SidebarProps) {
   // Global history syncer: build up history over time on every visit
   useEffect(() => {
     if (!username) return;
-    api.getProblems(username)
-      .then((res) => {
-        import("@/lib/history").then((m) => m.mergeStoredProblems(username, res.problems));
-      })
-      .catch((err) => console.warn("Failed to sync global history:", err));
+    import("@/lib/history").then((m) => {
+      const stored = m.getStoredProblems(username);
+      if (stored.length > 0) {
+        api.enrichHistory(username, stored)
+          .then((res) => m.mergeStoredProblems(username, res.problems))
+          .catch((err) => console.warn("Failed to enrich history:", err));
+      } else {
+        api.getProblems(username)
+          .then((res) => m.mergeStoredProblems(username, res.problems))
+          .catch((err) => console.warn("Failed to sync global history:", err));
+      }
+    });
   }, [username]);
 
   return (

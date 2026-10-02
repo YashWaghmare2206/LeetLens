@@ -52,7 +52,7 @@ LeetLens turns a raw LeetCode submission history into actionable insight. Enter 
 | **Interview Readiness Score** | A proprietary 0–100 score combining four weighted pillars: Topic Breadth (30%), Difficulty Depth (30%), Pattern Mastery (25%), and Streak/Velocity Consistency (15%). |
 
 > [!NOTE]
-> **Data Limit:** Because this project is fully stateless and uses LeetCode's public GraphQL API without authentication, the analysis is based solely on your **20 to 40 most recent submissions**. Older submissions outside this window are not included in pattern mapping or difficulty distributions.
+> **Data Limit & Local History:** Because this project is fully stateless and uses LeetCode's public GraphQL API without authentication, the live sync is based solely on your **20 to 40 most recent submissions**. However, LeetLens accumulates your confirmed solved problems and manually imported lists in your browser's `localStorage` across visits. These stored problems are seamlessly sent to the backend for enrichment, completely bypassing the LeetCode API limit and providing full, comprehensive analytics over time without requiring authentication.
 
 ---
 

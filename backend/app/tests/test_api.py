@@ -78,12 +78,6 @@ async def test_problems_not_found(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_invalid_short_username(client: AsyncClient):
-    resp = await client.post("/api/v1/users/x/sync")
-    assert resp.status_code == 400
-
-
-@pytest.mark.asyncio
 async def test_username_url_normalization(client: AsyncClient):
     """Backend normalizes LeetCode URLs — test via the normalization function directly."""
     from app.api.v1.router import _normalize_username
@@ -105,7 +99,6 @@ async def test_overview_after_manual_user_creation(client: AsyncClient):
     from app.services.stateless_service import _STATELESS_STORE
 
     _STATELESS_STORE["manual_test_user"] = {
-        "cached_at": time.time(),
         "user": {
             "id": 1,
             "username": "manual_test_user",

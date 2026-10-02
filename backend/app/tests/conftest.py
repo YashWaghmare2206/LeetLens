@@ -8,11 +8,16 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 
-@pytest_asyncio.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+@pytest.fixture(autouse=True)
+def mock_leetcode_provider(monkeypatch):
+    """Prevent hitting live LeetCode API in tests."""
+    from app.providers.leetcode.client import LeetCodeProvider
+    async def _mock_profile(self, username):
+        return None
+    monkeypatch.setattr(LeetCodeProvider, "get_profile", _mock_profile)
+    async def _mock_full(self, username):
+        return None
+    monkeypatch.setattr(LeetCodeProvider, "get_full_user_data", _mock_full)
 
 @pytest_asyncio.fixture
 async def client() -> AsyncClient:

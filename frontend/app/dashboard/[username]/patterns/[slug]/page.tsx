@@ -18,10 +18,7 @@ export default function PatternDetailPage({ params }: Props) {
 
   useEffect(() => {
     api.getPatternDetail(username, slug)
-      .then((res) => {
-        setData(res);
-        import("@/lib/history").then((m) => m.mergeStoredProblems(username, res.problems));
-      })
+      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [username, slug]);

@@ -77,11 +77,11 @@ _STATELESS_STORE: TTLCache = TTLCache(maxsize=100, ttl=300)
 
 class StatelessService:
     @staticmethod
-    async def get_or_fetch(username: str, force: bool = False) -> dict[str, Any] | None:
+    async def get_or_fetch(username: str, force: bool = False, history_dicts: list[dict] | None = None) -> dict[str, Any] | None:
         """Fetch and compute all analytics in-memory directly from LeetCode."""
         normalized = username.strip().lower()
 
-        if not force and normalized in _STATELESS_STORE:
+        if not force and not history_dicts and normalized in _STATELESS_STORE:
             return _STATELESS_STORE[normalized]
 
         async with LeetCodeProvider() as lc:
@@ -154,14 +154,40 @@ class StatelessService:
 
             seen_slugs = set()
             recent = []
+            
+            # Process live API submissions first
             for s in recent_ac + all_recent:
                 if s.slug and s.slug not in seen_slugs:
                     seen_slugs.add(s.slug)
                     recent.append(s)
+                    
+            # Process history dicts (from frontend localStorage)
+            if history_dicts:
+                from app.providers.leetcode.parser import LCSubmission
+                for hd in history_dicts:
+                    slug = hd.get("slug")
+                    if slug and slug not in seen_slugs:
+                        seen_slugs.add(slug)
+                        # We don't have a reliable timestamp for imported ones, fallback to now if missing
+                        ts = None
+                        if hd.get("solved_at"):
+                            try:
+                                ts = datetime.strptime(hd["solved_at"], "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+                            except:
+                                pass
+                        recent.append(LCSubmission(
+                            id=0, title=hd.get("title") or slug, slug=slug, status="Accepted", timestamp=ts, lang=""
+                        ))
 
             # Concurrently fetch problem metadata (difficulty & topic tags)
             sem = asyncio.Semaphore(4)
+            known_map = {hd.get("slug"): hd for hd in (history_dicts or []) if hd.get("slug")}
+            
             async def fetch_q(slug: str):
+                known = known_map.get(slug, {})
+                # Skip API call if we already have the full metadata from the frontend
+                if known.get("difficulty") and known.get("leetcode_id") and known.get("topics") is not None and len(known.get("topics", [])) > 0:
+                    return slug, None
                 async with sem:
                     try:
                         return slug, await lc.get_question_data(slug)
@@ -175,22 +201,30 @@ class StatelessService:
             solved: list[StatelessSolved] = []
             for idx, sub in enumerate(recent, 1):
                 q_data = q_map.get(sub.slug)
-                diff_str = (q_data.difficulty if q_data else "Unknown").title()
+                known = known_map.get(sub.slug, {})
+                
+                if q_data:
+                    diff_str = q_data.difficulty or "Medium"
+                    lc_id = q_data.frontend_id or 0
+                    title = q_data.title or sub.title
+                    topic_tags = q_data.topic_tags or []
+                else:
+                    diff_str = known.get("difficulty") or "Medium"
+                    lc_id = known.get("leetcode_id") or 0
+                    title = known.get("title") or sub.title
+                    topic_tags = known.get("topics") or []
+                    
                 try:
-                    diff = Difficulty(diff_str)
+                    diff = Difficulty(diff_str.title())
                 except Exception:
                     diff = Difficulty.UNKNOWN
 
-                lc_id = q_data.frontend_id if q_data else 0
-                title = (q_data.title if q_data else None) or sub.title
-
                 # Map topics
                 problem_topics = []
-                if q_data and q_data.topic_tags:
-                    for tag in q_data.topic_tags:
-                        t_slug = _to_slug(tag)
-                        top = _TOPIC_MAP.get(t_slug) or StatelessTopic(id=len(_TOPIC_MAP) + 1, name=tag, slug=t_slug)
-                        problem_topics.append(StatelessProblemTopic(topic=top))
+                for tag in topic_tags:
+                    t_slug = _to_slug(tag)
+                    top = _TOPIC_MAP.get(t_slug) or StatelessTopic(id=len(_TOPIC_MAP) + 1, name=tag, slug=t_slug)
+                    problem_topics.append(StatelessProblemTopic(topic=top))
 
                 # Map patterns
                 problem_patterns = []

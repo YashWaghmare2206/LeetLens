@@ -15,6 +15,19 @@ from app.schemas.analytics import (
     CoverageResponse, ProblemsResponse,
 )
 from app.schemas.user import UserResponse
+from typing import Optional
+
+class EnrichProblem(BaseModel):
+    leetcode_id: int
+    title: Optional[str] = None
+    slug: str
+    difficulty: str
+    url: Optional[str] = None
+    solved_at: Optional[str] = None
+    topics: Optional[list[str]] = None
+
+class EnrichRequest(BaseModel):
+    history: list[EnrichProblem]
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +54,16 @@ async def get_user(username: str):
     return user
 
 
+
+
+@router.post("/users/{username}/enrich")
+async def enrich_history(username: str, req: EnrichRequest):
+    username = _normalize_username(username)
+    history_dicts = [p.dict() for p in req.history]
+    result = await StatelessService.get_or_fetch(username, force=True, history_dicts=history_dicts)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found on LeetCode")
+    return {"status": "ok", "problems": result.get("problems", {}).get("problems", [])}
 
 
 @router.get("/users/{username}/overview", response_model=OverviewResponse)
