@@ -160,3 +160,40 @@ async def test_overview_after_manual_user_creation(client: AsyncClient):
     assert data["easy"] == 1
     assert data["medium"] == 0
     assert data["hard"] == 0
+
+@pytest.mark.asyncio
+async def test_profile_only_fallback(client: AsyncClient, monkeypatch):
+    from app.providers.leetcode.client import LeetCodeProvider
+    from app.providers.leetcode.parser import LCProfile
+    async def _mock_profile(self, username):
+        return LCProfile(username="fallback", real_name="Fallback", avatar_url="", ranking=100)
+    async def _mock_full(self, username):
+        return None  # Trigger fallback
+    monkeypatch.setattr(LeetCodeProvider, "get_profile", _mock_profile)
+    monkeypatch.setattr(LeetCodeProvider, "get_full_user_data", _mock_full)
+    
+    resp = await client.get("/api/v1/users/fallback_user/overview")
+    assert resp.status_code == 200
+    assert resp.json()["total_solved"] == 0
+
+@pytest.mark.asyncio
+async def test_enrich_endpoint(client: AsyncClient, monkeypatch):
+    from app.providers.leetcode.client import LeetCodeProvider
+    from app.providers.leetcode.parser import LCFullUserData
+    async def _mock_full(self, username):
+        return LCFullUserData(username="enrich", total_solved=0, easy_solved=0, medium_solved=0, hard_solved=0,
+                              total_submissions=0, tag_problem_counts=[], badges=[], upcoming_badges=[],
+                              languages=[], submission_calendar="{}", acceptance_rate=0.0, reputation=0,
+                              real_name="E", avatar_url="", ranking=1, streak=0, total_active_days=0,
+                              beats_easy=0, beats_medium=0, beats_hard=0)
+    monkeypatch.setattr(LeetCodeProvider, "get_full_user_data", _mock_full)
+    
+    payload = {
+        "history": [
+            {"leetcode_id": 1, "slug": "two-sum", "difficulty": "Easy", "title": "Two Sum", "topics": ["array"]}
+        ]
+    }
+    resp = await client.post("/api/v1/users/enrich_user/enrich", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert len(resp.json()["problems"]) == 1

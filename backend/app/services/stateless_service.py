@@ -107,6 +107,12 @@ class StatelessService:
                     beats_medium=None,
                     beats_hard=None,
                     tag_problem_counts=[],
+                    badges=[],
+                    upcoming_badges=[],
+                    languages=[],
+                    submission_calendar="{}",
+                    acceptance_rate=0.0,
+                    reputation=0,
                 )
 
             # Build StatelessUser
@@ -163,20 +169,19 @@ class StatelessService:
                     
             # Process history dicts (from frontend localStorage)
             if history_dicts:
-                from app.providers.leetcode.parser import LCSubmission
+                from app.providers.leetcode.parser import LCRecentSubmission
                 for hd in history_dicts:
                     slug = hd.get("slug")
                     if slug and slug not in seen_slugs:
                         seen_slugs.add(slug)
-                        # We don't have a reliable timestamp for imported ones, fallback to now if missing
                         ts = None
                         if hd.get("solved_at"):
                             try:
                                 ts = datetime.strptime(hd["solved_at"], "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
-                            except:
+                            except ValueError:
                                 pass
-                        recent.append(LCSubmission(
-                            id=0, title=hd.get("title") or slug, slug=slug, status="Accepted", timestamp=ts, lang=""
+                        recent.append(LCRecentSubmission(
+                            submission_id="history", title=hd.get("title") or slug, slug=slug, timestamp=ts
                         ))
 
             # Concurrently fetch problem metadata (difficulty & topic tags)
@@ -209,7 +214,7 @@ class StatelessService:
                     title = q_data.title or sub.title
                     topic_tags = q_data.topic_tags or []
                 else:
-                    diff_str = known.get("difficulty") or "Medium"
+                    diff_str = known.get("difficulty") or "Unknown"
                     lc_id = known.get("leetcode_id") or 0
                     title = known.get("title") or sub.title
                     topic_tags = known.get("topics") or []
