@@ -49,7 +49,10 @@ LeetLens turns a raw LeetCode submission history into actionable insight. Enter 
 | **Stateless & Private** | No database. All analytics are computed in memory from LeetCode's public GraphQL API. Your data is never stored on our servers. |
 | **Taxonomy Explorer** | Problems are mapped against 15+ core topics and 71+ high-frequency interview patterns. |
 | **Spaced Repetition Hub** | Review intervals are tracked in the browser's local storage, so you revisit patterns at the right moment. |
-| **Interview Readiness Score** | A proprietary 0–100 score combining total problems solved, difficulty distribution, and unique patterns covered. |
+| **Interview Readiness Score** | A proprietary 0–100 score combining four weighted pillars: Topic Breadth (30%), Difficulty Depth (30%), Pattern Mastery (25%), and Streak/Velocity Consistency (15%). |
+
+> [!NOTE]
+> **Data Limit:** Because this project is fully stateless and uses LeetCode's public GraphQL API without authentication, the analysis is based solely on your **20 to 40 most recent submissions**. Older submissions outside this window are not included in pattern mapping or difficulty distributions.
 
 ---
 

@@ -4,9 +4,11 @@
  */
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
+import { api } from "@/lib/api";
 
 interface SidebarProps {
   username: string;
@@ -83,6 +85,16 @@ const navItems = [
 export default function Sidebar({ username }: SidebarProps) {
   const pathname = usePathname();
   const base = `/dashboard/${username}`;
+
+  // Global history syncer: build up history over time on every visit
+  useEffect(() => {
+    if (!username) return;
+    api.getProblems(username)
+      .then((res) => {
+        import("@/lib/history").then((m) => m.mergeStoredProblems(username, res.problems));
+      })
+      .catch((err) => console.warn("Failed to sync global history:", err));
+  }, [username]);
 
   return (
     <aside

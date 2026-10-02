@@ -18,7 +18,10 @@ export default function PatternDetailPage({ params }: Props) {
 
   useEffect(() => {
     api.getPatternDetail(username, slug)
-      .then(setData)
+      .then((res) => {
+        setData(res);
+        import("@/lib/history").then((m) => m.mergeStoredProblems(username, res.problems));
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [username, slug]);
@@ -51,8 +54,13 @@ export default function PatternDetailPage({ params }: Props) {
 
       {/* Header */}
       <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>{data.pattern}</h1>
-      <p style={{ fontSize: 14, color: "var(--gray-500)", marginBottom: 28 }}>
-        {data.solved_count} problems solved in this pattern
+      <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 28, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span><strong>{data.solved_count}</strong> lifetime solves recorded</span>
+        {data.problems.length > 0 && data.problems.length < data.solved_count && (
+          <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 12, background: "rgba(99, 102, 241, 0.15)", color: "var(--brand-300)", border: "1px solid rgba(99, 102, 241, 0.3)" }}>
+            Showing {data.problems.length} confirmed recent submission(s)
+          </span>
+        )}
       </p>
 
       {/* Stat row */}

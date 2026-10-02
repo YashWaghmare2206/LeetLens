@@ -137,8 +137,10 @@ for (lc_id, pname, conf) in PROBLEM_PATTERNS:
 
 
 
-_STATELESS_STORE: dict[str, dict[str, Any]] = {}
-_CACHE_TTL = 300  # 5 minutes
+from cachetools import TTLCache
+
+_STATELESS_STORE: TTLCache = TTLCache(maxsize=100, ttl=300)
+
 
 
 class StatelessService:
@@ -149,9 +151,7 @@ class StatelessService:
         now = time.time()
 
         if not force and normalized in _STATELESS_STORE:
-            cached = _STATELESS_STORE[normalized]
-            if now - cached.get("cached_at", 0) < _CACHE_TTL:
-                return cached
+            return _STATELESS_STORE[normalized]
 
         async with LeetCodeProvider() as lc:
             full_data = await lc.get_full_user_data(username)
@@ -266,6 +266,16 @@ class StatelessService:
                 if lc_id in _LC_ID_TO_PATTERNS:
                     for pat, conf in _LC_ID_TO_PATTERNS[lc_id]:
                         problem_patterns.append(StatelessProblemPattern(pattern=pat, confidence=conf))
+                else:
+                    # Option 5 Fallback: Infer patterns from topic tags if problem not explicitly mapped
+                    if q_data and q_data.topic_tags:
+                        seen_pat_slugs = set()
+                        for tag in q_data.topic_tags:
+                            t_slug = _to_slug(tag)
+                            matched_pat = _PATTERN_MAP.get(t_slug) or _PATTERN_MAP.get(tag)
+                            if matched_pat and matched_pat.slug not in seen_pat_slugs:
+                                seen_pat_slugs.add(matched_pat.slug)
+                                problem_patterns.append(StatelessProblemPattern(pattern=matched_pat, confidence=0.85))
 
                 prob = StatelessProblem(
                     id=idx,

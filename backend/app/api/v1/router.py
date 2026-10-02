@@ -9,14 +9,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from app.models.sync_job import SyncStatus
 from app.services.stateless_service import StatelessService
 from app.schemas.analytics import (
     OverviewResponse, TopicsResponse, PatternsResponse,
     CoverageResponse, ProblemsResponse,
 )
 from app.schemas.user import UserResponse
-from app.schemas.sync_job import SyncJobResponse
 
 logger = logging.getLogger(__name__)
 
@@ -42,47 +40,6 @@ async def get_user(username: str):
         raise HTTPException(status_code=404, detail=f"User '{username}' not found on LeetCode")
     return user
 
-
-
-@router.post("/users/{username}/sync", response_model=SyncJobResponse, status_code=202)
-async def trigger_sync(
-    username: str,
-    force: bool = Query(False, description="Bypass the 5-minute sync cooldown"),
-):
-    username = _normalize_username(username)
-    if not username or len(username) < 2:
-        raise HTTPException(status_code=400, detail="Invalid username")
-
-    data = await StatelessService.get_or_fetch(username, force=force)
-    if not data:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found on LeetCode")
-
-    now = datetime.now(timezone.utc)
-    return SyncJobResponse(
-        id=1,
-        user_id=1,
-        status=SyncStatus.SUCCESS,
-        progress=100,
-        started_at=now,
-        completed_at=now,
-        created_at=now,
-        error=None,
-    )
-
-
-@router.get("/sync/{job_id}", response_model=SyncJobResponse)
-async def get_sync_status(job_id: int):
-    now = datetime.now(timezone.utc)
-    return SyncJobResponse(
-        id=job_id,
-        user_id=1,
-        status=SyncStatus.SUCCESS,
-        progress=100,
-        started_at=now,
-        completed_at=now,
-        created_at=now,
-        error=None,
-    )
 
 
 
@@ -183,17 +140,4 @@ async def get_problems(
     return result
 
 
-class ProblemImportRequest(BaseModel):
-    items: list[str]
 
-
-@router.post("/users/{username}/problems/import")
-async def import_problems(
-    username: str,
-    payload: ProblemImportRequest,
-):
-    username = _normalize_username(username)
-    data = await StatelessService.get_or_fetch(username)
-    if not data:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
-    return {"message": f"Processed {len(payload.items)} items", "imported": len(payload.items)}

@@ -2,8 +2,9 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ProblemsResponse } from "@/lib/api";
+import { api, ProblemsResponse, ProblemInPattern } from "@/lib/api";
 import { difficultyClass, fmt } from "@/lib/utils";
+import { mergeStoredProblems, getStoredProblems, clearStoredProblems } from "@/lib/history";
 
 interface Props { params: Promise<{ username: string }> }
 
@@ -17,6 +18,7 @@ export default function ProblemsPage({ params }: Props) {
   const [search, setSearch] = useState("");
   const [dateSearch, setDateSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [storedCount, setStoredCount] = useState(0);
 
   // Spaced Repetition Revisit State
   const [onlyRevisit, setOnlyRevisit] = useState(false);
@@ -31,8 +33,35 @@ export default function ProblemsPage({ params }: Props) {
   const fetchProblems = () => {
     const diff = filter !== "All" ? filter : undefined;
     api.getProblems(username, diff)
-      .then(setData)
-      .catch((e) => setError(e.message))
+      .then((res) => {
+        // Merge with client localStorage history
+        const { merged, totalStored } = mergeStoredProblems(username, res.problems);
+        const finalProblems = diff
+          ? merged.filter((p) => p.difficulty?.toLowerCase() === diff.toLowerCase())
+          : merged;
+        setData({
+          ...res,
+          problems: finalProblems,
+        });
+        setStoredCount(totalStored);
+      })
+      .catch((e) => {
+        // Fallback to local storage if API error or offline
+        const local = getStoredProblems(username);
+        if (local.length > 0) {
+          const finalProblems = diff
+            ? local.filter((p) => p.difficulty?.toLowerCase() === diff.toLowerCase())
+            : local;
+          setData({
+            username,
+            total: local.length,
+            problems: finalProblems,
+          });
+          setStoredCount(local.length);
+        } else {
+          setError(e.message);
+        }
+      })
       .finally(() => setLoading(false));
   };
 
@@ -51,10 +80,46 @@ export default function ProblemsPage({ params }: Props) {
     setImporting(true);
     setImportResult(null);
     try {
-      const res = await api.importProblems(username, items);
-      setImportResult(`Successfully imported ${res.added} problem(s)!`);
-      setImportInput("");
-      fetchProblems();
+      const parsedCustom: ProblemInPattern[] = items
+        .map((raw) => {
+          let slug = raw.trim();
+          const match = slug.match(/leetcode\.com\/problems\/([^/?#]+)/);
+          if (match) slug = match[1];
+          slug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+          const title = slug
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+          return {
+            leetcode_id: 0,
+            title: title || raw,
+            slug,
+            difficulty: "Medium" as const,
+            url: `https://leetcode.com/problems/${slug}/`,
+            solved_at: new Date().toISOString().replace("T", " ").slice(0, 16),
+            topics: [],
+          };
+        })
+        .filter((p) => Boolean(p.slug));
+
+      if (parsedCustom.length > 0) {
+        const { merged, newlyAdded, totalStored } = mergeStoredProblems(username, parsedCustom);
+        setStoredCount(totalStored);
+        const finalProblems = filter !== "All"
+          ? merged.filter((p) => p.difficulty?.toLowerCase() === filter.toLowerCase())
+          : merged;
+        setData((prev) =>
+          prev
+            ? { ...prev, problems: finalProblems }
+            : { username, total: totalStored, problems: finalProblems }
+        );
+        setImportResult(
+          `Successfully saved ${newlyAdded} new problem(s) to your browser history! Total preserved: ${totalStored}`
+        );
+        setImportInput("");
+      } else {
+        setImportResult("No valid problem slugs or URLs found.");
+      }
     } catch (err: any) {
       setImportResult(`Import failed: ${err.message || "Unknown error"}`);
     } finally {
@@ -97,8 +162,31 @@ export default function ProblemsPage({ params }: Props) {
         <div>
           <h1 className="section-title">Solved Problems</h1>
           <p className="section-subtitle">
-            Showing <strong style={{ color: "#ffffff" }}>{filtered.length}</strong> verified problem records {data?.total ? `· ${fmt(data.total)} total solved on LeetCode` : ""}
+            Showing <strong style={{ color: "#ffffff" }}>{filtered.length}</strong> problem records {data?.total ? `· ${fmt(data.total)} total solved on LeetCode` : ""}
           </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-muted)", marginTop: 6, flexWrap: "wrap" }}>
+            <span>💾 <strong>{storedCount}</strong> saved in browser history</span>
+            <span style={{ color: "var(--border-subtle)" }}>•</span>
+            <span style={{ color: "var(--brand-400)" }}>Accumulates across visits</span>
+            {storedCount > 0 && (
+              <>
+                <span style={{ color: "var(--border-subtle)" }}>•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Reset local problem cache for @${username}?`)) {
+                      clearStoredProblems(username);
+                      fetchProblems();
+                    }
+                  }}
+                  className="btn-ghost"
+                  style={{ fontSize: 11, padding: "2px 6px", color: "var(--text-muted)", textDecoration: "underline" }}
+                >
+                  Reset local cache
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {/* Text Search */}
@@ -269,8 +357,9 @@ export default function ProblemsPage({ params }: Props) {
         }}>
           <div className="glass-card" style={{ maxWidth: 520, width: "100%", padding: 28 }}>
             <h2 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: "var(--text-primary)" }}>Import Solved Problems</h2>
-            <p style={{ fontSize: 13, color: "var(--gray-400)", marginBottom: 16, lineHeight: 1.5 }}>
-              Paste problem IDs or slugs (comma or newline separated).
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 16, lineHeight: 1.5 }}>
+              Paste problem slugs, IDs, or full LeetCode URLs (comma or newline separated).
+              These are saved directly into your browser&apos;s persistent private storage!
             </p>
             <form onSubmit={handleImport}>
               <textarea
