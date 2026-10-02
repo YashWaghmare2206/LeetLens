@@ -77,12 +77,29 @@ _STATELESS_STORE: TTLCache = TTLCache(maxsize=100, ttl=300)
 
 class StatelessService:
     @staticmethod
-    async def get_or_fetch(username: str, force: bool = False, history_dicts: list[dict] | None = None) -> dict[str, Any] | None:
+    async def get_or_fetch(username: str, force: bool = False, history_dicts: list[dict] | None = None, history_key: str | None = None) -> dict[str, Any] | None:
         """Fetch and compute all analytics in-memory directly from LeetCode."""
+        import hashlib
         normalized = username.strip().lower()
 
-        if not force and not history_dicts and normalized in _STATELESS_STORE:
-            return _STATELESS_STORE[normalized]
+        cache_key = normalized
+        new_history_key = None
+        if history_dicts:
+            hist_str = json.dumps(history_dicts, sort_keys=True)
+            new_history_key = hashlib.sha256(hist_str.encode()).hexdigest()[:16]
+            cache_key = f"{normalized}_{new_history_key}"
+        elif history_key:
+            cache_key = f"{normalized}_{history_key}"
+
+        if not force and cache_key in _STATELESS_STORE:
+            res = _STATELESS_STORE[cache_key]
+            # When looking up via history_key, we want to ensure we actually hit it.
+            return res
+
+        # If we didn't hit cache and a history_key was provided without actual history_dicts,
+        # it means the history_key has expired. We return None so the router can return 409.
+        if history_key and not history_dicts:
+            return None
 
         async with LeetCodeProvider() as lc:
             full_data = await lc.get_full_user_data(username)
@@ -188,14 +205,37 @@ class StatelessService:
             sem = asyncio.Semaphore(4)
             known_map = {hd.get("slug"): hd for hd in (history_dicts or []) if hd.get("slug")}
             
+            # Limit the number of metadata lookups to prevent abuse
+            lookups = 0
+            
             async def fetch_q(slug: str):
+                nonlocal lookups
                 known = known_map.get(slug, {})
                 # Skip API call if we already have the full metadata from the frontend
-                if known.get("difficulty") and known.get("leetcode_id") and known.get("topics") is not None and len(known.get("topics", [])) > 0:
+                # We need a difficulty that is not "Unknown"
+                has_diff = known.get("difficulty") and known.get("difficulty") != "Unknown"
+                if has_diff and known.get("leetcode_id") and known.get("topics") is not None and len(known.get("topics", [])) > 0:
                     return slug, None
+                
+                # Try global cache first
+                from cachetools import TTLCache
+                global _QUESTION_CACHE
+                if "_QUESTION_CACHE" not in globals():
+                    _QUESTION_CACHE = TTLCache(maxsize=5000, ttl=86400)
+                
+                if slug in _QUESTION_CACHE:
+                    return slug, _QUESTION_CACHE[slug]
+                    
+                if lookups >= 50:
+                    return slug, None # Cap reached
+                    
+                lookups += 1
                 async with sem:
                     try:
-                        return slug, await lc.get_question_data(slug)
+                        res = await lc.get_question_data(slug)
+                        if res:
+                            _QUESTION_CACHE[slug] = res
+                        return slug, res
                     except Exception:
                         return slug, None
 
@@ -245,7 +285,7 @@ class StatelessService:
                             matched_pat = _PATTERN_MAP.get(t_slug) or _PATTERN_MAP.get(tag)
                             if matched_pat and matched_pat.slug not in seen_pat_slugs:
                                 seen_pat_slugs.add(matched_pat.slug)
-                                problem_patterns.append(StatelessProblemPattern(pattern=matched_pat, confidence=0.5))
+                                problem_patterns.append(StatelessProblemPattern(pattern=matched_pat, confidence=0.5, inferred=True))
 
                 prob = StatelessProblem(
                     id=idx,
@@ -322,27 +362,29 @@ class StatelessService:
             },
         }
 
-        _STATELESS_STORE[normalized] = data
+        _STATELESS_STORE[cache_key] = data
+        if new_history_key:
+            data["history_key"] = new_history_key
         return data
 
     @staticmethod
-    async def get_overview(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_overview(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("overview") if data else None
 
     @staticmethod
-    async def get_topics(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_topics(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("topics") if data else None
 
     @staticmethod
-    async def get_patterns(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_patterns(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("patterns") if data else None
 
     @staticmethod
-    async def get_pattern_detail(username: str, pattern_slug: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_pattern_detail(username: str, pattern_slug: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         if not data:
             return None
         patterns_data = data.get("patterns", {}).get("patterns", [])
@@ -361,13 +403,13 @@ class StatelessService:
         return None
 
     @staticmethod
-    async def get_coverage(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_coverage(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("coverage") if data else None
 
     @staticmethod
-    async def get_problems(username: str, difficulty: str | None = None) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_problems(username: str, difficulty: str | None = None, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         if not data:
             return None
         raw = data.get("problems", {})
@@ -382,26 +424,26 @@ class StatelessService:
         }
 
     @staticmethod
-    async def get_taxonomy_explorer(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_taxonomy_explorer(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("taxonomy") if data else None
 
     @staticmethod
-    async def get_student_analysis(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_student_analysis(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("student_analysis") if data else None
 
     @staticmethod
-    async def get_activity_timeline(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_activity_timeline(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("timeline") if data else None
 
     @staticmethod
-    async def get_pattern_practice(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_pattern_practice(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("practice") if data else None
 
     @staticmethod
-    async def get_user(username: str) -> dict | None:
-        data = await StatelessService.get_or_fetch(username)
+    async def get_user(username: str, history_key: str | None = None) -> dict | None:
+        data = await StatelessService.get_or_fetch(username, history_key=history_key)
         return data.get("user") if data else None

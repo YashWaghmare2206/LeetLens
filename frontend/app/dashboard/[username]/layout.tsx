@@ -3,6 +3,7 @@
  * with persistent sidebar and guaranteed deep dark background.
  */
 import Sidebar from "@/components/Sidebar";
+import EnrichTrigger from "@/components/EnrichTrigger";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,7 @@ export default async function DashboardLayout({ children, params }: LayoutProps)
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#0a0d14", color: "#ffffff" }}>
+      <EnrichTrigger username={username} />
       <Sidebar username={username} />
       <main
         style={{

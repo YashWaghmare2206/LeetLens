@@ -94,10 +94,11 @@ export default function ProblemsPage({ params }: Props) {
             leetcode_id: 0,
             title: title || raw,
             slug,
-            difficulty: "Medium" as const,
+            difficulty: "Unknown" as const,
             url: `https://leetcode.com/problems/${slug}/`,
-            solved_at: new Date().toISOString().replace("T", " ").slice(0, 16),
+            solved_at: null,
             topics: [],
+            source: "imported" as const,
           };
         })
         .filter((p) => Boolean(p.slug));
@@ -431,14 +432,21 @@ export default function ProblemsPage({ params }: Props) {
                       {p.title}
                     </td>
                     <td>
-                      <span className={difficultyClass(p.difficulty)} style={{ fontSize: 12 }}>
-                        {p.difficulty}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className={difficultyClass(p.difficulty)} style={{ fontSize: 12 }}>
+                          {p.difficulty}
+                        </span>
+                        {p.source === "imported" && p.difficulty === "Unknown" && (
+                          <span style={{ fontSize: 10, background: "rgba(255,255,255,0.1)", padding: "2px 6px", borderRadius: 4, color: "#cbd5e1" }}>
+                            Unverified
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 500 }}>
-                          {p.solved_at ? p.solved_at.split("T")[0] : "—"}
+                          {p.solved_at ? p.solved_at.split("T")[0] : "No Date"}
                         </span>
                         {daysAgo != null && (
                           <span

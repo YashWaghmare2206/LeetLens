@@ -100,6 +100,7 @@ export interface ProblemInPattern {
   url: string | null;
   solved_at?: string | null;
   topics?: string[];
+  source?: "imported";
 }
 
 export interface PatternStat {
@@ -231,47 +232,95 @@ export interface StudentAnalysisResponse {
 }
 
 
+const enrichPromises: Record<string, Promise<string | null> | undefined> = {};
+const currentHistoryKeys: Record<string, string | null> = {};
+
+export async function ensureEnriched(username: string): Promise<string | null> {
+  const norm = username.toLowerCase();
+  if (enrichPromises[norm]) {
+    return enrichPromises[norm];
+  }
+  const promise = (async () => {
+    try {
+      const { getStoredProblems } = await import("./history");
+      const history = getStoredProblems(username);
+      if (history.length > 0) {
+        const res = await api.enrichHistory(username, history);
+        currentHistoryKeys[norm] = res.history_key || null;
+        return res.history_key || null;
+      }
+    } catch (err) {
+      console.warn("Failed to enrich history:", err);
+    }
+    return null;
+  })();
+  enrichPromises[norm] = promise;
+  return promise;
+}
+
+async function analyticsRequest<T>(path: string, username: string): Promise<T> {
+  let hKey = await ensureEnriched(username);
+  const norm = username.toLowerCase();
+  
+  const doReq = async (key: string | null) => {
+    const p = key ? (path.includes("?") ? `${path}&history_key=${key}` : `${path}?history_key=${key}`) : path;
+    return request<T>(p);
+  };
+
+  try {
+    return await doReq(hKey);
+  } catch (err: unknown) {
+    if ((err as { status?: number }).status === 409) {
+      // Re-enrich
+      delete enrichPromises[norm];
+      hKey = await ensureEnriched(username);
+      return await doReq(hKey);
+    }
+    throw err;
+  }
+}
+
 export const api = {
   enrichHistory: (username: string, history: ProblemInPattern[]) =>
-    request<{ problems: ProblemInPattern[] }>(`/api/v1/users/${encodeURIComponent(username)}/enrich`, {
+    request<{ history_key?: string, problems: ProblemInPattern[] }>(`/api/v1/users/${encodeURIComponent(username)}/enrich`, {
       method: "POST",
       body: JSON.stringify({ history }),
     }),
 
   getUser: (username: string) =>
-    request<UserProfile>(`/api/v1/users/${encodeURIComponent(username)}`),
+    analyticsRequest<UserProfile>(`/api/v1/users/${encodeURIComponent(username)}`, username),
 
   getOverview: (username: string) =>
-    request<Overview>(`/api/v1/users/${encodeURIComponent(username)}/overview`),
+    analyticsRequest<Overview>(`/api/v1/users/${encodeURIComponent(username)}/overview`, username),
 
   getTopics: (username: string) =>
-    request<TopicsResponse>(`/api/v1/users/${encodeURIComponent(username)}/topics`),
+    analyticsRequest<TopicsResponse>(`/api/v1/users/${encodeURIComponent(username)}/topics`, username),
 
   getPatterns: (username: string) =>
-    request<PatternsResponse>(`/api/v1/users/${encodeURIComponent(username)}/patterns`),
+    analyticsRequest<PatternsResponse>(`/api/v1/users/${encodeURIComponent(username)}/patterns`, username),
 
   getPatternDetail: (username: string, patternSlug: string) =>
-    request<PatternStat>(`/api/v1/users/${encodeURIComponent(username)}/patterns/${patternSlug}`),
+    analyticsRequest<PatternStat>(`/api/v1/users/${encodeURIComponent(username)}/patterns/${patternSlug}`, username),
 
   getCoverage: (username: string) =>
-    request<CoverageResponse>(`/api/v1/users/${encodeURIComponent(username)}/gaps`),
+    analyticsRequest<CoverageResponse>(`/api/v1/users/${encodeURIComponent(username)}/gaps`, username),
 
   getProblems: (username: string, difficulty?: string) => {
     const params = difficulty ? `?difficulty=${difficulty}` : "";
-    return request<ProblemsResponse>(`/api/v1/users/${encodeURIComponent(username)}/problems${params}`);
+    return analyticsRequest<ProblemsResponse>(`/api/v1/users/${encodeURIComponent(username)}/problems${params}`, username);
   },
 
   getTaxonomyExplorer: (username: string) =>
-    request<TaxonomyExplorerResponse>(`/api/v1/users/${encodeURIComponent(username)}/taxonomy-explorer`),
+    analyticsRequest<TaxonomyExplorerResponse>(`/api/v1/users/${encodeURIComponent(username)}/taxonomy-explorer`, username),
 
   getStudentAnalysis: (username: string) =>
-    request<StudentAnalysisResponse>(`/api/v1/users/${encodeURIComponent(username)}/student-analysis`),
+    analyticsRequest<StudentAnalysisResponse>(`/api/v1/users/${encodeURIComponent(username)}/student-analysis`, username),
 
   getActivityTimeline: (username: string) =>
-    request<ActivityTimelineResponse>(`/api/v1/users/${encodeURIComponent(username)}/activity-timeline`),
+    analyticsRequest<ActivityTimelineResponse>(`/api/v1/users/${encodeURIComponent(username)}/activity-timeline`, username),
 
   getPatternPractice: (username: string) =>
-    request<PatternPracticeResponse>(`/api/v1/users/${encodeURIComponent(username)}/pattern-practice`),
+    analyticsRequest<PatternPracticeResponse>(`/api/v1/users/${encodeURIComponent(username)}/pattern-practice`, username),
 };
 
 export interface ActivityDayProblem {

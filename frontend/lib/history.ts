@@ -69,6 +69,8 @@ export function mergeStoredProblems(
       problemMap.set(key, {
         ...prev,
         ...p,
+        difficulty: p.difficulty === "Unknown" ? prev.difficulty : p.difficulty,
+        leetcode_id: p.leetcode_id || prev.leetcode_id,
         solved_at: p.solved_at || prev.solved_at,
         topics: p.topics && p.topics.length > 0 ? p.topics : prev.topics,
       });

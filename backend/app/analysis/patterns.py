@@ -59,6 +59,7 @@ def compute_patterns(
                 "slug": p.slug,
                 "difficulty": p.difficulty.value,
                 "url": p.url,
+                "inferred": pp.inferred,
             })
 
     # 2. Correlate with LeetCode verified skills (e.g. two-pointers: 38, sliding-window: 14)

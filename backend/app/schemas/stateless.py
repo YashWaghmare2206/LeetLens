@@ -29,6 +29,7 @@ class StatelessPattern:
 class StatelessProblemPattern:
     pattern: StatelessPattern
     confidence: float
+    inferred: bool = False
 
 
 @dataclass

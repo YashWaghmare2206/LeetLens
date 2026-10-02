@@ -149,8 +149,13 @@ def compute_student_analysis(
         depth_score = 0
 
     # 3. Mastery Score (0-25 pts)
-    # High volume in advanced patterns
-    adv_count = skill_map.get("dynamic-programming", 0) + skill_map.get("graph", 0) + skill_map.get("monotonic-stack", 0)
+    # High volume in advanced patterns, scaled by confidence so inferred patterns don't count at full weight.
+    adv_count = 0.0
+    for s in solved:
+        for pp in s.problem.patterns:
+            if pp.pattern.slug in ("dynamic-programming", "graph", "monotonic-stack", "trie", "union-find", "backtracking"):
+                adv_count += pp.confidence
+    
     mastery_score = min(25, round(min(adv_count, 35) / 35 * 25))
 
     # 4. Consistency Score (0-15 pts)
